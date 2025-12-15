@@ -7,6 +7,18 @@ const activeElement = ref({
 	tag: "",
 	text: "",
 });
+const previouslyFocusedElement = ref<HTMLElement | null>(null);
+const openModal = () => {
+	previouslyFocusedElement.value = document.activeElement as HTMLElement;
+	isOpen.value = true;
+};
+const closeModal = () => {
+	isOpen.value = false;
+};
+const restoreFocus = () => {
+	previouslyFocusedElement.value?.focus();
+	previouslyFocusedElement.value = null;
+};
 
 // Updates the active element display whenever focus changes in the document
 const updateActiveElement = () => {
@@ -43,9 +55,9 @@ const mainContent = ref<HTMLElement | null>(null);
 watch(isOpen, async (newVal) => {
 	if (newVal && modalRef.value) {
 		// Wait for DOM update before manipulating focus
-		await nextTick();
+		// await nextTick();
 		// Move focus into the modal automatically when opened
-		modalRef.value.focus();
+		// modalRef.value.focus();
 		// Enable keyboard event handling (Escape key and focus trap)
 		window.addEventListener("keydown", handleKeydown);
 
@@ -63,11 +75,17 @@ watch(isOpen, async (newVal) => {
 	}
 });
 
+const focusModal = () => {
+	if (modalRef.value) {
+		modalRef.value.focus();
+	}
+};
+
 // Handle keyboard interactions while modal is open
 const handleKeydown = (event: KeyboardEvent) => {
 	// Close modal with Escape key
 	if (event.key === "Escape" && isOpen.value) {
-		isOpen.value = false;
+		closeModal();
 	}
 
 	// Keep focus trapped within modal
@@ -106,7 +124,7 @@ const trapFocus = (event: KeyboardEvent) => {
 		<!-- Nuxt's built-in route change announcer for screen readers -->
 		<NuxtRouteAnnouncer />
 		<div ref="mainContent">
-			<button @click="isOpen = !isOpen">Open Modal</button>
+			<button @click="openModal">Open Modal</button>
 
 			<!-- Debug display showing currently focused element -->
 			<div style="margin-top: 2rem; font-family: monospace">
@@ -124,22 +142,39 @@ const trapFocus = (event: KeyboardEvent) => {
 			- aria-modal="true" indicates this is a modal interaction
 			- aria-labelledby connects the modal to its title for screen readers
 		-->
-		<div
-			v-show="isOpen"
-			ref="modalRef"
-			tabindex="-1"
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby="modalTitle"
+		<Transition
+			name="modal-fade"
+			@after-enter="focusModal"
+			@after-leave="restoreFocus"
 		>
-			<h2 id="modalTitle">Modal Dialog</h2>
-			<!-- Close button provides visible close mechanism (Escape also works) -->
-			<button @click="isOpen = false">Close</button>
-			<button>Option 1</button>
-			<button>Option 2</button>
-		</div>
+			<div
+				v-show="isOpen"
+				ref="modalRef"
+				tabindex="-1"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="modalTitle"
+			>
+				<h2 id="modalTitle">Modal Dialog</h2>
+				<!-- Close button provides visible close mechanism (Escape also works) -->
+				<button @click="closeModal">Close</button>
+				<button>Option 1</button>
+				<button>Option 2</button>
+			</div>
+		</Transition>
 	</div>
 	<div aria-live="assertive" class="sr-only">
 		Modal opened: {{ isOpen ? "Yes" : "No" }}
 	</div>
 </template>
+<style scoped>
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+	transition: opacity 0.2s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+	opacity: 0;
+}
+</style>
